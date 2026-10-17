@@ -2,7 +2,6 @@ require("express-async-errors");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const path = require("path");
 const authRoutes = require("./routes/authRoutes");
 const shipmentRoutes = require("./routes/shipmentRoutes");
 const trackingRoutes = require("./routes/trackingRoutes");
@@ -20,8 +19,6 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api", shipmentRoutes);
 app.use("/api", trackingRoutes);
-
-app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // Catches any error thrown in a route handler, so the client gets a
 // response instead of a hung request.

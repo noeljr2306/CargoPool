@@ -7,7 +7,10 @@ async function listMyContainers(req, res) {
   const containers = await withTenant(req.user.tenantId, (tx) =>
     tx.container.findMany({
       where: { forwarderTenantId: req.user.tenantId },
-      include: { shipments: true, manifests: true },
+      include: {
+        shipments: true,
+        manifests: { orderBy: { generatedAt: "desc" } },
+      },
       orderBy: { id: "desc" },
     }),
   );

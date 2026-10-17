@@ -119,7 +119,7 @@ The Prisma schema is in `server/prisma/schema.prisma`; migrations are in `server
 
 ### Generated files
 
-Manifest PDFs and QR-code PNGs are written under `server/uploads/manifests/` and `server/uploads/qrcodes/`. Express serves this directory at `/uploads`.
+Manifest PDFs and QR-code PNGs are rendered on demand from database records and streamed from the API; the server does not persist generated documents or images on its local filesystem.
 
 ## HTTP API
 
@@ -139,6 +139,8 @@ The API listens on port `4000` by default. Except for health and authentication 
 | `GET` | `/api/containers/:id` | Authenticated | Get a container and its shipments. |
 | `PATCH` | `/api/containers/:id/close` | `FORWARDER` | Close an open container. |
 | `POST` | `/api/containers/:id/manifest` | `FORWARDER` | Generate a PDF manifest and container QR code. |
+| `GET` | `/api/containers/:id/manifest.pdf` | Public by container UUID | Render and stream the generated manifest PDF. |
+| `GET` | `/api/containers/:id/qr.png` | Public by container UUID | Generate and return the container tracking QR image. |
 | `POST` | `/api/tracking/scan` | `TRANSPORT_PERSONNEL`, `FORWARDER` | Record a valid container milestone. |
 | `GET` | `/api/shipments/:id/tracking` | `SHIPPER` | Get tracking for a shipment owned by the current tenant. |
 
@@ -173,7 +175,7 @@ From `server/`, generate the Prisma client, apply migrations, and optionally see
 ```bash
 npm run prisma:generate
 npm run prisma:migrate
-npm run prisma:seed
+node prisma/seed.js
 ```
 
 `prisma:migrate` uses Prisma's development migration flow. For a deployed environment, apply committed migrations with `npx prisma migrate deploy` instead.
@@ -200,8 +202,9 @@ Open `http://localhost:3000`. The API health endpoint is `http://localhost:4000/
 
 | Variable | Used by | Required | Description |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | Server / Prisma | Yes | PostgreSQL connection URL for normal application queries; use a database role subject to RLS. |
+| `DATABASE_URL` | Server / Prisma | Yes | PostgreSQL connection URL for normal application queries; use an application role subject to RLS (for example, `app_user`). |
 | `ADMIN_DATABASE_URL` | Server / Prisma admin client | Yes | PostgreSQL connection URL for explicitly cross-tenant operations; configure the role to bypass RLS. |
+| `MIGRATE_DATABASE_URL` | Prisma migrations | Yes for migrations | Direct PostgreSQL connection URL used by Prisma's `directUrl`, typically the database owner/migration role. |
 | `JWT_SECRET` | Server | Yes | Secret used to sign and verify JWTs. Supply a strong, private value. |
 | `PORT` | Server | No | HTTP listening port; defaults to `4000`. |
 | `NEXT_PUBLIC_API_URL` | Client build/runtime | Yes | Base URL for API requests, such as `http://localhost:4000`. Do not include a trailing slash. |
@@ -213,6 +216,7 @@ Example local values (replace the database URL placeholders and secret before ru
 # server/.env
 DATABASE_URL=your_application_database_url
 ADMIN_DATABASE_URL=your_admin_database_url
+MIGRATE_DATABASE_URL=your_direct_migration_database_url
 JWT_SECRET=replace-with-a-long-random-secret
 PORT=4000
 TRACKING_BASE_URL=http://localhost:3000/track
@@ -227,9 +231,15 @@ The server test setup loads `server/.env.test` before tests run. Configure it wi
 
 ## Database setup
 
-The schema is PostgreSQL-specific and includes RLS policies that read `app.current_tenant_id`. The migrations create the schema and enable RLS on tenant-scoped tables; the shared `hs_code_mapping` table is intentionally not tenant-scoped. Ensure both database roles and their grants are configured appropriately before running the app.
+The schema is PostgreSQL-specific and includes RLS policies that read `app.current_tenant_id`. The Prisma `directUrl` reads `MIGRATE_DATABASE_URL`, so use a direct owner/migration connection when deploying migrations. For example, from `server/`:
 
-The seed script inserts sample HS-code keyword mappings, including entries for hibiscus, shea butter, cocoa beans, textiles, leather bags, wooden crafts, groundnuts, palm oil, and ginger. It creates rows on each run; avoid rerunning it against the same database unless duplicate mappings are acceptable.
+```bash
+MIGRATE_DATABASE_URL=your_direct_migration_database_url npx prisma migrate deploy
+```
+
+The migrations create the schema and enable RLS on tenant-scoped tables; the shared `hs_code_mapping` table is intentionally not tenant-scoped. After migration, grant `app_user` the required privileges on existing tables and sequences, then verify that its `rolbypassrls` value is `false`. Keep the owner/migration credentials separate from runtime application credentials. The runtime admin connection used for explicitly cross-tenant app operations must be configured with the required RLS-bypass privileges.
+
+The seed script inserts sample HS-code keyword mappings, including entries for hibiscus, shea butter, cocoa beans, textiles, leather bags, wooden crafts, groundnuts, palm oil, and ginger. Run it from `server/` with `node prisma/seed.js`. It creates rows on each run; avoid rerunning it against the same database unless duplicate mappings are acceptable.
 
 ## Tests and quality checks
 
@@ -258,8 +268,9 @@ npm run build
 - Container matching is a basic first-fit search over open containers in ID order; it does not optimize route, destination, shipping date, or carrier.
 - New containers have a fixed capacity of `100`; the departure deadline is set to seven days after creation.
 - HS classification is substring matching against local seed data, not an external customs service or authoritative tariff determination. Classification may need professional review.
-- QR codes encode `${TRACKING_BASE_URL}/<container-id>`, but the frontend currently has no `/track/[id]` page or unauthenticated public-tracking endpoint. The available tracking API requires authentication and the shipper role.
+- QR codes encode `${TRACKING_BASE_URL}/<container-id>`, but the frontend currently has no `/track/[id]` page or unauthenticated public-tracking endpoint. The tracking history API requires authentication and the shipper role.
 - The transport dashboard accepts a pasted/scanned container ID and selected milestone; camera-based QR scanning is not implemented.
-- Manifest files are stored on the server's local filesystem. Production deployments need durable/shared storage and an appropriate retention strategy.
+- Manifest PDFs and QR-code PNGs are served by public endpoints (`GET /api/containers/:id/manifest.pdf` and `GET /api/containers/:id/qr.png`) and rendered on demand from the database. Access is unauthenticated and relies on the container UUID being difficult to guess; anyone who obtains the URL can access the manifest, including shipment details. Enforcing stricter access would require an authenticated download flow.
+- Existing manifest rows may still contain legacy `/uploads/...` URLs. Generate a new manifest for those containers so their links point to the on-demand endpoints.
 - There is no interface for creating customs-agent or transport-personnel accounts.
 - `server/src/routes/manifestRoutes.js` exists, but `server/src/app.js` does not mount it; manifest generation is currently exposed through the container route in `shipmentRoutes.js`.
