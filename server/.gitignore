@@ -1,4 +1,6 @@
 node_modules/
 .env
+.en.test
+uploads/
 dist/
 *.log

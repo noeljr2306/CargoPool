@@ -10,7 +10,7 @@ const trackingRoutes = require("./routes/trackingRoutes");
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000' }));
 app.use(express.json());
 
 app.get("/health", (req, res) => {
@@ -26,7 +26,7 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 // Catches any error thrown in a route handler, so the client gets a
 // response instead of a hung request.
 app.use((err, req, res, next) => {
-  console.error(err);
+  if (process.env.NODE_ENV !== "test") console.error(err);
   res
     .status(err.status || 500)
     .json({ error: err.message || "Internal server error" });
