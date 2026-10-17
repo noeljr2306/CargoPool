@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantType {
+  SHIPPER
+  FORWARDER
+}
+
+enum UserRole {
+  SHIPPER
+  FORWARDER
+  CUSTOMS_AGENT
+  TRANSPORT_PERSONNEL
+}
+
+enum ContainerStatus {
+  OPEN
+  CLOSED
+  IN_TRANSIT
+  DELIVERED
+}
+
+enum ManifestStatus {
+  PENDING
+  GENERATED
+}
+
+model Tenant {
+  id         String     @id @default(uuid())
+  name       String
+  type       TenantType
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  users      User[]
+  containers Container[] @relation("ForwarderContainers")
+  shipments  Shipment[]  @relation("ShipperShipments")
+
+  @@map("tenant")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  trackingEvents TrackingEvent[]
+  auditLogs      AuditLog[]
+
+  @@map("user")
+}
+
+model Container {
+  id                 String          @id @default(uuid())
+  forwarderTenantId  String          @map("forwarder_tenant_id")
+  capacity           Float
+  filledCapacity     Float           @default(0) @map("filled_capacity")
+  status             ContainerStatus @default(OPEN)
+  departureDeadline  DateTime?       @map("departure_deadline")
+
+  forwarderTenant Tenant          @relation("ForwarderContainers", fields: [forwarderTenantId], references: [id])
+  shipments       Shipment[]
+  manifests       Manifest[]
+  trackingEvents  TrackingEvent[]
+
+  @@map("container")
+}
+
+model Shipment {
+  id                String   @id @default(uuid())
+  shipperTenantId   String   @map("shipper_tenant_id")
+  containerId       String?  @map("container_id")
+  productDescription String  @map("product_description")
+  quantity          Int
+  weightVolume      Float    @map("weight_volume")
+  hsCode            String?  @map("hs_code")
+  destination       String
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  shipperTenant Tenant     @relation("ShipperShipments", fields: [shipperTenantId], references: [id])
+  container     Container? @relation(fields: [containerId], references: [id])
+
+  @@map("shipment")
+}
+
+model HsCodeMapping {
+  id          String @id @default(uuid())
+  keyword     String
+  hsCode      String @map("hs_code")
+  description String
+
+  @@map("hs_code_mapping")
+}
+
+model Manifest {
+  id          String         @id @default(uuid())
+  containerId String         @map("container_id")
+  generatedAt DateTime?      @map("generated_at")
+  pdfUrl      String?        @map("pdf_url")
+  status      ManifestStatus @default(PENDING)
+
+  container Container @relation(fields: [containerId], references: [id])
+
+  @@map("manifest")
+}
+
+model TrackingEvent {
+  id            String   @id @default(uuid())
+  containerId   String   @map("container_id")
+  scannedByUserId String @map("scanned_by_user_id")
+  milestone     String
+  timestamp     DateTime @default(now())
+
+  container   Container @relation(fields: [containerId], references: [id])
+  scannedBy   User      @relation(fields: [scannedByUserId], references: [id])
+
+  @@map("tracking_event")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  action       String
+  tableAffected String  @map("table_affected")
+  timestamp    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_log")
+}
