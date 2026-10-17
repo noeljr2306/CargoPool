@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #0F1B2D;
+  --color-paper: #F7F5F1;
+  --color-cargo: #E8873B;
+  --color-ink: #1C232C;
+  --color-slate: #5B6673;
+  --color-sea: #2C6E6B;
+}
+
+/* `inline` because these values come from next/font's runtime CSS
+   variables (set via className on <html>), not static theme values. */
+@theme inline {
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), sans-serif;
+}
+
+body {
+  font-family: var(--font-body), sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid #E8873B;
+  outline-offset: 2px;
+}
