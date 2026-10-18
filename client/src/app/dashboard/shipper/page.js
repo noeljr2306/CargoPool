@@ -8,7 +8,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import FillMeter from "@/components/FillMeter";
-import Timeline from "@/components/TimeLine";
+import Timeline from "@/components/Timeline";
 import EmptyState from "@/components/EmptyState";
 import Notice from "@/components/Notice";
 import Code from "@/components/Code";
