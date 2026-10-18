@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import apiRequest from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import AuthLayout from "@/components/AuthLayout";
+import Notice from "@/components/Notice";
 
 const DASHBOARD_BY_ROLE = {
   SHIPPER: "/dashboard/shipper",
@@ -53,11 +54,9 @@ export default function RegisterPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">
-            Company / organization name
-          </label>
+          <label className="label">Company / organization name</label>
           <input
-            className="w-full border border-slate/30 rounded px-3 py-2.5 bg-white text-ink focus-visible:border-cargo"
+            className="input"
             value={form.tenantName}
             onChange={(e) => update("tenantName", e.target.value)}
             required
@@ -65,11 +64,9 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">
-            Account type
-          </label>
+          <label className="label">Account type</label>
           <select
-            className="w-full border border-slate/30 rounded px-3 py-2.5 bg-white text-ink focus-visible:border-cargo"
+            className="input"
             value={form.tenantType}
             onChange={(e) => update("tenantType", e.target.value)}
           >
@@ -79,12 +76,10 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">
-            Email
-          </label>
+          <label className="label">Email</label>
           <input
             type="email"
-            className="w-full border border-slate/30 rounded px-3 py-2.5 bg-white text-ink focus-visible:border-cargo"
+            className="input"
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
             required
@@ -92,32 +87,30 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">
-            Password
-          </label>
+          <label className="label">Password</label>
           <input
             type="password"
-            className="w-full border border-slate/30 rounded px-3 py-2.5 bg-white text-ink focus-visible:border-cargo"
+            className="input"
             value={form.password}
             onChange={(e) => update("password", e.target.value)}
             required
           />
         </div>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <Notice>{error}</Notice>
 
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-cargo hover:bg-cargo/90 text-white rounded py-2.5 font-medium transition-colors disabled:opacity-50"
+          className="btn-primary w-full"
         >
           {submitting ? "Creating account…" : "Register"}
         </button>
       </form>
 
-      <p className="text-sm text-slate mt-6">
+      <p className="mt-6 text-sm text-slate">
         Already have an account?{" "}
-        <Link href="/login" className="text-cargo font-medium">
+        <Link href="/login" className="font-medium text-cargo-dark">
           Log in
         </Link>
       </p>

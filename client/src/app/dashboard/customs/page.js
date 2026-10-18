@@ -5,17 +5,28 @@ import apiRequest from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import RequireAuth from "@/components/RequireAuth";
 import DashboardLayout from "@/components/DashboardLayout";
+import StatCard from "@/components/StatCard";
+import EmptyState from "@/components/EmptyState";
+import Notice from "@/components/Notice";
+
+const NAV = [{ label: "Review queue", href: "#queue" }];
 
 function CustomsDashboard() {
   const { token } = useAuth();
   const [shipments, setShipments] = useState([]);
-  const [codes, setCodes] = useState({}); // shipmentId -> input value
+  const [loading, setLoading] = useState(true);
+  const [codes, setCodes] = useState({}); // shipmentId -> typed value
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
 
   async function load() {
-    const data = await apiRequest("/api/shipments/review", { token });
-    setShipments(data);
+    try {
+      setShipments(await apiRequest("/api/shipments/review", { token }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -23,7 +34,7 @@ function CustomsDashboard() {
   }, []);
 
   async function handleAssign(id) {
-    const hsCode = codes[id];
+    const hsCode = (codes[id] || "").trim();
     if (!hsCode) return;
     setError("");
     setBusyId(id);
@@ -42,45 +53,90 @@ function CustomsDashboard() {
   }
 
   return (
-    <DashboardLayout title="Customs review queue">
-      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-
-      {shipments.length === 0 && (
-        <p className="text-slate">Nothing awaiting classification.</p>
-      )}
-
-      <div className="space-y-3">
-        {shipments.map((s) => (
-          <div
-            key={s.id}
-            className="bg-white border border-slate/15 rounded p-4 flex items-center justify-between gap-4"
-          >
-            <div>
-              <p className="font-medium text-ink">{s.productDescription}</p>
-              <p className="text-sm text-slate mt-0.5">
-                {s.shipperTenant?.name} · Qty {s.quantity} · {s.destination}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <input
-                className="border border-slate/30 rounded px-3 py-2 text-sm w-32 font-mono focus-visible:border-cargo"
-                placeholder="HS code"
-                value={codes[s.id] || ""}
-                onChange={(e) =>
-                  setCodes((c) => ({ ...c, [s.id]: e.target.value }))
-                }
-              />
-              <button
-                onClick={() => handleAssign(s.id)}
-                disabled={busyId === s.id || !codes[s.id]}
-                className="bg-cargo hover:bg-cargo/90 text-white rounded px-4 py-2 text-sm font-medium disabled:opacity-50"
-              >
-                Assign
-              </button>
-            </div>
-          </div>
-        ))}
+    <DashboardLayout
+      title="Customs review queue"
+      subtitle="Shipments the keyword engine could not classify. Assign an HS code to release them."
+      nav={NAV}
+    >
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Awaiting classification" value={shipments.length} />
+        <StatCard
+          label="Oldest waiting since"
+          value={
+            shipments[0]
+              ? new Date(shipments[0].createdAt).toLocaleDateString()
+              : "—"
+          }
+        />
       </div>
+
+      <div className="mt-6">
+        <Notice>{error}</Notice>
+      </div>
+
+      <section id="queue" className="panel mt-6 overflow-hidden">
+        {loading ? (
+          <p className="px-5 py-8 text-sm text-slate">Loading queue…</p>
+        ) : shipments.length === 0 ? (
+          <EmptyState title="All caught up">
+            Every shipment has an HS code. New unmatched shipments will appear
+            here.
+          </EmptyState>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px]">
+              <thead className="border-b border-line bg-paper">
+                <tr>
+                  <th className="th">Product</th>
+                  <th className="th">Shipper</th>
+                  <th className="th">Qty</th>
+                  <th className="th">Destination</th>
+                  <th className="th">Submitted</th>
+                  <th className="th">Assign HS code</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {shipments.map((s) => (
+                  <tr key={s.id}>
+                    <td className="td font-medium">{s.productDescription}</td>
+                    <td className="td">{s.shipperTenant?.name || "—"}</td>
+                    <td className="td">{s.quantity}</td>
+                    <td className="td">{s.destination}</td>
+                    <td className="td text-slate">
+                      {new Date(s.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="td">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleAssign(s.id);
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <input
+                          className="input w-32 font-mono"
+                          placeholder="e.g. 1211.90"
+                          value={codes[s.id] || ""}
+                          onChange={(e) =>
+                            setCodes((c) => ({ ...c, [s.id]: e.target.value }))
+                          }
+                        />
+                        <button
+                          type="submit"
+                          disabled={busyId === s.id || !codes[s.id]}
+                          className="btn-primary"
+                        >
+                          Assign
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </DashboardLayout>
   );
 }

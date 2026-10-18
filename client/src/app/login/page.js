@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import apiRequest from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import AuthLayout from "@/components/AuthLayout";
+import Notice from "@/components/Notice";
 
 const DASHBOARD_BY_ROLE = {
   SHIPPER: "/dashboard/shipper",
@@ -44,12 +45,10 @@ export default function LoginPage() {
     <AuthLayout title="Log in" subtitle="Access your shipments and containers.">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">
-            Email
-          </label>
+          <label className="label">Email</label>
           <input
             type="email"
-            className="w-full border border-slate/30 rounded px-3 py-2.5 bg-white text-ink focus-visible:border-cargo"
+            className="input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -57,32 +56,30 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-ink mb-1.5">
-            Password
-          </label>
+          <label className="label">Password</label>
           <input
             type="password"
-            className="w-full border border-slate/30 rounded px-3 py-2.5 bg-white text-ink focus-visible:border-cargo"
+            className="input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
         </div>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <Notice>{error}</Notice>
 
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-cargo hover:bg-cargo/90 text-white rounded py-2.5 font-medium transition-colors disabled:opacity-50"
+          className="btn-primary w-full"
         >
           {submitting ? "Logging in…" : "Log in"}
         </button>
       </form>
 
-      <p className="text-sm text-slate mt-6">
+      <p className="mt-6 text-sm text-slate">
         No account yet?{" "}
-        <Link href="/register" className="text-cargo font-medium">
+        <Link href="/register" className="font-medium text-cargo-dark">
           Register
         </Link>
       </p>

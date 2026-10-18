@@ -5,22 +5,30 @@ import apiRequest from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import RequireAuth from "@/components/RequireAuth";
 import DashboardLayout from "@/components/DashboardLayout";
+import Timeline from "@/components/TimeLine";
+import Notice from "@/components/Notice";
 
 const MILESTONES = [
-  "DEPARTED",
-  "IN_TRANSIT",
-  "CUSTOMS_CLEARED",
-  "ARRIVED",
-  "DELIVERED",
+  { value: "DEPARTED", label: "Departed" },
+  { value: "IN_TRANSIT", label: "In transit" },
+  { value: "CUSTOMS_CLEARED", label: "Customs cleared" },
+  { value: "ARRIVED", label: "Arrived" },
+  { value: "DELIVERED", label: "Delivered" },
+];
+
+const NAV = [
+  { label: "Record a scan", href: "#scan" },
+  { label: "This session", href: "#session" },
 ];
 
 function TransportDashboard() {
   const { token } = useAuth();
   const [containerId, setContainerId] = useState("");
-  const [milestone, setMilestone] = useState(MILESTONES[0]);
+  const [milestone, setMilestone] = useState(MILESTONES[0].value);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [recorded, setRecorded] = useState([]); // scans made during this visit, newest first
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -28,12 +36,21 @@ function TransportDashboard() {
     setSuccess("");
     setSubmitting(true);
     try {
-      await apiRequest("/api/tracking/scan", {
+      const event = await apiRequest("/api/tracking/scan", {
         method: "POST",
         token,
-        body: { containerId, milestone },
+        body: { containerId: containerId.trim(), milestone },
       });
-      setSuccess(`Recorded "${milestone}" for that container.`);
+      setRecorded((list) => [
+        {
+          id: event.id,
+          milestone: event.milestone,
+          timestamp: event.timestamp,
+          detail: event.containerId.slice(0, 8),
+        },
+        ...list,
+      ]);
+      setSuccess("Scan recorded. The shipper can now see this update.");
       setContainerId("");
     } catch (err) {
       setError(err.message);
@@ -43,55 +60,69 @@ function TransportDashboard() {
   }
 
   return (
-    <DashboardLayout title="Scan a milestone">
-      <div className="bg-white border border-slate/15 rounded p-6 max-w-md">
-        <p className="text-sm text-slate mb-6">
-          Enter the container ID from the QR code and select the milestone
-          reached.
-        </p>
+    <DashboardLayout
+      title="Record a milestone"
+      subtitle="Enter the container ID from its QR code and choose the milestone it has reached."
+      nav={NAV}
+    >
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,440px)_1fr]">
+        <section id="scan" className="panel p-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="label">Container ID</label>
+              <input
+                className="input font-mono"
+                value={containerId}
+                onChange={(e) => setContainerId(e.target.value)}
+                placeholder="Paste the container ID"
+                required
+              />
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">
-              Container ID
-            </label>
-            <input
-              className="w-full border border-slate/30 rounded px-3 py-2.5 font-mono text-sm focus-visible:border-cargo"
-              value={containerId}
-              onChange={(e) => setContainerId(e.target.value)}
-              placeholder="Paste or scan the container ID"
-              required
-            />
-          </div>
+            <div>
+              <p className="label">Milestone</p>
+              <div className="flex flex-wrap gap-2">
+                {MILESTONES.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    aria-pressed={milestone === m.value}
+                    onClick={() => setMilestone(m.value)}
+                    className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      milestone === m.value
+                        ? "border-navy bg-navy text-paper"
+                        : "border-line bg-white text-ink hover:bg-paper"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">
-              Milestone
-            </label>
-            <select
-              className="w-full border border-slate/30 rounded px-3 py-2.5 focus-visible:border-cargo"
-              value={milestone}
-              onChange={(e) => setMilestone(e.target.value)}
+            <Notice>{error}</Notice>
+            <Notice type="success">{success}</Notice>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary w-full"
             >
-              {MILESTONES.map((m) => (
-                <option key={m} value={m}>
-                  {m.replace("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
+              {submitting ? "Recording…" : "Record scan"}
+            </button>
+          </form>
+        </section>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          {success && <p className="text-sea text-sm">{success}</p>}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full bg-cargo hover:bg-cargo/90 text-white rounded py-2.5 font-medium disabled:opacity-50"
-          >
-            {submitting ? "Recording…" : "Record scan"}
-          </button>
-        </form>
+        <section id="session" className="panel p-6">
+          <h2 className="mb-4 font-display text-lg font-semibold text-ink">
+            Recorded this session
+          </h2>
+          <Timeline
+            events={recorded}
+            newestFirst
+            emptyText="Scans you record will appear here."
+          />
+        </section>
       </div>
     </DashboardLayout>
   );
