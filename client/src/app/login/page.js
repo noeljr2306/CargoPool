@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import apiRequest from "@/lib/api";
+import useWarmup from "@/lib/useWarmup";
 import { useAuth } from "@/context/AuthContext";
 import AuthLayout from "@/components/AuthLayout";
 import Notice from "@/components/Notice";
+import PasswordInput from "@/components/PasswordInput";
 
 const DASHBOARD_BY_ROLE = {
   SHIPPER: "/dashboard/shipper",
@@ -20,13 +22,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [slow, setSlow] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+
+  useWarmup();
+
+  // Start loading the dashboards while the user types.
+  useEffect(() => {
+    Object.values(DASHBOARD_BY_ROLE).forEach((path) => router.prefetch(path));
+  }, [router]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setSlow(false);
     setSubmitting(true);
+    const timer = setTimeout(() => setSlow(true), 4000);
     try {
       const data = await apiRequest("/api/auth/login", {
         method: "POST",
@@ -37,6 +49,8 @@ export default function LoginPage() {
     } catch (err) {
       setError(err.message);
     } finally {
+      clearTimeout(timer);
+      setSlow(false);
       setSubmitting(false);
     }
   }
@@ -51,22 +65,24 @@ export default function LoginPage() {
             className="input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
             required
           />
         </div>
 
         <div>
           <label className="label">Password</label>
-          <input
-            type="password"
-            className="input"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            required
           />
         </div>
 
         <Notice>{error}</Notice>
+        <Notice type="info">
+          {slow &&
+            "The server is waking up after being idle. The first login can take up to a minute."}
+        </Notice>
 
         <button
           type="submit"

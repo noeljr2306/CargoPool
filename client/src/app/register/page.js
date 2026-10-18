@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import apiRequest from "@/lib/api";
+import useWarmup from "@/lib/useWarmup";
 import { useAuth } from "@/context/AuthContext";
 import AuthLayout from "@/components/AuthLayout";
 import Notice from "@/components/Notice";
+import PasswordInput from "@/components/PasswordInput";
 
 const DASHBOARD_BY_ROLE = {
   SHIPPER: "/dashboard/shipper",
@@ -22,8 +24,15 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [slow, setSlow] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+
+  useWarmup();
+
+  useEffect(() => {
+    Object.values(DASHBOARD_BY_ROLE).forEach((path) => router.prefetch(path));
+  }, [router]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -32,7 +41,9 @@ export default function RegisterPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setSlow(false);
     setSubmitting(true);
+    const timer = setTimeout(() => setSlow(true), 4000);
     try {
       const data = await apiRequest("/api/auth/register", {
         method: "POST",
@@ -43,6 +54,8 @@ export default function RegisterPage() {
     } catch (err) {
       setError(err.message);
     } finally {
+      clearTimeout(timer);
+      setSlow(false);
       setSubmitting(false);
     }
   }
@@ -82,22 +95,25 @@ export default function RegisterPage() {
             className="input"
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
+            autoComplete="email"
             required
           />
         </div>
 
         <div>
           <label className="label">Password</label>
-          <input
-            type="password"
-            className="input"
+          <PasswordInput
             value={form.password}
             onChange={(e) => update("password", e.target.value)}
-            required
+            autoComplete="new-password"
           />
         </div>
 
         <Notice>{error}</Notice>
+        <Notice type="info">
+          {slow &&
+            "The server is waking up after being idle. The first signup can take up to a minute."}
+        </Notice>
 
         <button
           type="submit"
