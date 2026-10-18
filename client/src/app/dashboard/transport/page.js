@@ -5,7 +5,7 @@ import apiRequest from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import RequireAuth from "@/components/RequireAuth";
 import DashboardLayout from "@/components/DashboardLayout";
-import Timeline from "@/components/TimeLine";
+import Timeline from "@/components/Timeline";
 import Notice from "@/components/Notice";
 
 const MILESTONES = [
